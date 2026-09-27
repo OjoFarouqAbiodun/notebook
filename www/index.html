@@ -1,0 +1,1194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Notebook</title>
+    <style>
+      /* ── Design tokens ──────────────────────────────────────────
+         Light editorial: warm paper, ink text, hairline rules,
+         one restrained accent. No gradients, no drop shadows.       */
+      :root {
+        --paper: #fbfaf7;
+        --surface: #ffffff;
+        --ink: #16150f;
+        --ink-2: #5c5a50;
+        --ink-3: #9a978b;
+        --rule: #e5e2d9;
+        --accent: #b8410a;
+        --accent-soft: #fbeee7;
+        --radius: 4px;
+        --serif: Georgia, "Times New Roman", serif;
+        --sans: "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      }
+
+      /* Base Reset & Mobile Flex Layout */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: var(--sans);
+      }
+      body {
+        background-color: var(--paper);
+        color: var(--ink);
+        display: flex;
+        flex-direction: column;
+        /* dvh, not vh: vh ignores the on-screen keyboard and would hide the input bar behind it */
+        height: 100dvh;
+        overflow: hidden;
+      }
+
+      /* Masthead */
+      header {
+        padding: 18px 20px 14px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        border-bottom: 2px solid var(--ink);
+      }
+      .kicker {
+        display: block;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 4px;
+      }
+      h2 {
+        font-family: var(--serif);
+        color: var(--ink);
+        font-size: 26px;
+        font-weight: 400;
+        letter-spacing: -0.01em;
+        line-height: 1.1;
+      }
+
+      /* 48px keeps the header icon at the recommended minimum tap target */
+      .icon-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        margin: -6px -10px 0 0;
+        cursor: pointer;
+        background: none;
+        border: none;
+        color: var(--ink);
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .icon-btn:active {
+        background-color: var(--accent-soft);
+      }
+
+      /* The Main Viewport Area */
+      .content-viewport {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* STATE 1: Loading — a thin rule sweep, not a chunky spinner */
+      .loading-state {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        flex: 1;
+        gap: 14px;
+      }
+      .spinner {
+        width: 32px;
+        height: 32px;
+        border: 2px solid var(--rule);
+        border-top-color: var(--ink);
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      .state-label {
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+
+      /* STATE 2: Empty */
+      .empty-state {
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        flex: 1;
+        padding: 0 32px;
+        gap: 12px;
+      }
+      .empty-icon {
+        font-family: var(--serif);
+        font-size: 40px;
+        line-height: 1;
+        color: var(--ink-3);
+      }
+      .empty-state .state-body {
+        color: var(--ink-2);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      /* STATE 3: Error */
+      .error-state {
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        flex: 1;
+        padding: 0 32px;
+        gap: 12px;
+      }
+      .error-icon {
+        font-family: var(--serif);
+        font-size: 40px;
+        line-height: 1;
+        color: var(--accent);
+      }
+      .error-state .state-body {
+        color: var(--ink-2);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .retry-btn {
+        margin-top: 6px;
+        background-color: var(--ink);
+        color: var(--paper);
+        font-family: var(--sans);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border: 1px solid var(--ink);
+        padding: 12px 24px;
+        border-radius: var(--radius);
+        cursor: pointer;
+      }
+      .retry-btn:active {
+        background-color: var(--accent);
+        border-color: var(--accent);
+      }
+
+      /* STATE 4: Full — the notes list */
+      .notes-list {
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .note-item {
+        background-color: var(--surface);
+        border: 1px solid var(--rule);
+        border-left: 2px solid var(--accent);
+        padding: 13px 15px;
+        border-radius: var(--radius);
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        animation: rise 0.22s ease-out;
+      }
+      .note-item.is-editing {
+        border-color: var(--accent);
+        border-left-color: var(--accent);
+      }
+      /* Row of per-note actions revealed on tap of the note body */
+      .note-actions {
+        display: none;
+        gap: 8px;
+        margin-top: 2px;
+      }
+      .note-item.is-open .note-actions {
+        display: flex;
+      }
+      .note-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 7px 10px;
+        font-family: var(--sans);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .note-action-btn:active {
+        color: var(--accent);
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .note-action-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      /* Swipe-to-delete. The row is a 2-column grid: delete panel sits behind,
+         the note card slides across it as the user drags. */
+      .note-row {
+        position: relative;
+        overflow: hidden;
+        border-radius: var(--radius);
+      }
+      .note-row.is-removing {
+        transition: height 0.2s ease, opacity 0.2s ease;
+        height: 0 !important;
+        opacity: 0;
+      }
+      .swipe-delete {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 22px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .swipe-delete svg {
+        width: 15px;
+        height: 15px;
+        margin-left: 8px;
+      }
+      .note-item {
+        position: relative;
+        background-color: var(--surface);
+        touch-action: pan-y;
+        will-change: transform;
+      }
+      .note-item.is-swiping {
+        transition: none;
+      }
+      .note-item.is-settling {
+        transition: transform 0.18s ease-out;
+      }
+
+      /* Undo bar that replaces the toast for deletions */
+      .undo-bar {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 96px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: var(--ink);
+        color: var(--paper);
+        padding: 13px 16px;
+        border-radius: var(--radius);
+        transform: translateY(14px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        z-index: 20;
+      }
+      .undo-bar.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      .undo-bar span {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .undo-btn {
+        background: none;
+        border: 1px solid rgba(251, 250, 247, 0.4);
+        color: var(--paper);
+        font-family: var(--sans);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 7px 12px;
+        border-radius: 3px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .undo-btn:active {
+        background: rgba(251, 250, 247, 0.16);
+      }
+
+      /* Transient confirmation, replaces a toast dependency */
+      .toast {
+        position: absolute;
+        left: 50%;
+        bottom: 96px;
+        transform: translate(-50%, 8px);
+        background: var(--ink);
+        color: var(--paper);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 11px 18px;
+        border-radius: var(--radius);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        z-index: 20;
+        white-space: nowrap;
+      }
+      .toast.is-visible {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .note-body {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .note-text {
+        font-family: var(--serif);
+        font-size: 16px;
+        line-height: 1.5;
+        color: var(--ink);
+        word-break: break-word;
+        white-space: pre-wrap;
+        cursor: text;
+      }
+      /* Clamp to 4 lines so a long note cannot push the rest of the list off screen.
+         -webkit- prefixed forms are kept for older Android WebView builds;
+         the unprefixed properties are the standardized ones. */
+      .note-text.is-clamped {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 4;
+        line-clamp: 4;
+        overflow: hidden;
+      }
+      .note-meta {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        font-family: var(--sans);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .note-time {
+        color: var(--accent);
+      }
+      .note-edit-hint {
+        opacity: 0;
+        color: var(--ink-3);
+      }
+      .note-text:not(.is-clamped) ~ .note-meta .note-edit-hint {
+        opacity: 1;
+      }
+      .note-edit-input {
+        width: 100%;
+        font-family: var(--serif);
+        font-size: 16px;
+        line-height: 1.5;
+        color: var(--ink);
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        padding: 8px;
+        resize: none;
+        outline: none;
+      }
+      .note-edit-input:focus {
+        border-color: var(--accent);
+      }
+      .delete-btn {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        line-height: 1;
+        color: var(--ink-3);
+        cursor: pointer;
+        border-radius: var(--radius);
+        margin: -6px -8px 0 0;
+      }
+      .delete-btn:active {
+        color: var(--accent);
+        background-color: var(--accent-soft);
+      }
+
+      /* STATE 5: The Thumb Zone Bottom Action Bar */
+      .bottom-action-bar {
+        padding: 12px 20px;
+        background-color: var(--surface);
+        border-top: 1px solid var(--rule);
+        display: flex;
+        gap: 10px;
+        /* Requires viewport-fit=cover in the meta tag, otherwise this resolves to 0 */
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+      }
+      input {
+        flex: 1;
+        padding: 13px 14px;
+        border-radius: var(--radius);
+        border: 1px solid var(--rule);
+        background-color: var(--paper);
+        color: var(--ink);
+        font-size: 16px;
+        outline: none;
+      }
+      input::placeholder {
+        color: var(--ink-3);
+      }
+      input:focus {
+        border-color: var(--ink);
+        background-color: var(--surface);
+      }
+      .add-btn {
+        background-color: var(--ink);
+        color: var(--paper);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        border: 1px solid var(--ink);
+        padding: 0 18px;
+        border-radius: var(--radius);
+      }
+      .add-btn:active {
+        background-color: var(--accent);
+        border-color: var(--accent);
+      }
+
+      /* Settings View Screen Container Styles */
+      .settings-view {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: var(--paper);
+        z-index: 10; /* Sits completely on top of the main screen list */
+        display: flex;
+        flex-direction: column;
+      }
+      .settings-header {
+        padding: 14px 20px;
+        border-bottom: 2px solid var(--ink);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .settings-header h3 {
+        font-family: var(--serif);
+        font-size: 20px;
+        font-weight: 400;
+        color: var(--ink);
+      }
+      .back-arrow-btn {
+        font-size: 30px;
+        line-height: 1;
+        color: var(--ink);
+      }
+      .settings-content {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        overflow-y: auto;
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+      }
+      .settings-group-label {
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        padding-bottom: 2px;
+      }
+      .settings-option {
+        background-color: var(--surface);
+        border: 1px solid var(--rule);
+        padding: 16px;
+        border-radius: var(--radius);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .settings-option span {
+        font-family: var(--serif);
+        font-size: 16px;
+      }
+      .app-version-text {
+        text-align: center;
+        color: var(--ink-3);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-top: 32px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="masthead">
+        <span class="kicker" id="noteCount">Personal Notes</span>
+        <h2>Notebook</h2>
+      </div>
+      <button class="icon-btn" id="settingsBtn" aria-label="Open settings">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.7 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.12.22.38.3.61.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.23.08.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z" />
+        </svg>
+      </button>
+    </header>
+
+    <!-- The Viewport where our states swap dynamically -->
+    <div class="content-viewport">
+      <!-- Loading State Panel -->
+      <div id="loadingState" class="loading-state">
+        <div class="spinner"></div>
+        <span class="state-label">Loading</span>
+      </div>
+
+      <!-- Empty State Panel -->
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon">&#8220;</div>
+        <span class="state-label">Nothing written yet</span>
+        <p class="state-body">
+          Every page starts as a blank one.<br />Add your first note below.
+        </p>
+      </div>
+
+      <!-- Error State Panel -->
+      <div id="errorState" class="error-state">
+        <div class="error-icon">&#8220;</div>
+        <span class="state-label">Unable to load</span>
+        <p class="state-body">
+          Your saved notes couldn't be read.<br />The stored data may be corrupted.
+        </p>
+        <button class="retry-btn" id="retryBtn">Try again</button>
+      </div>
+
+      <!-- Full State Panel (The List Container) -->
+      <div id="notesList" class="notes-list"></div>
+    </div>
+
+    <!-- Thumb-Zone Input Bar at the Bottom -->
+    <div class="bottom-action-bar">
+      <input type="text" id="noteInput" placeholder="Write a quick note..." />
+      <button class="add-btn" onclick="addNote()">Add</button>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <div class="undo-bar" id="undoBar" role="status" aria-live="polite">
+      <span id="undoLabel">Note deleted</span>
+      <button class="undo-btn" id="undoBtn" type="button">Undo</button>
+    </div>
+
+    <!-- STATE/SCREEN 2: Full Screen Settings View Container -->
+    <div id="settingsView" class="settings-view" style="display: none">
+      <div class="settings-header">
+        <button class="icon-btn" id="backBtn" aria-label="Go back">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <h3>Application Settings</h3>
+      </div>
+      <div class="settings-content">
+        <span class="settings-group-label">Feedback</span>
+        <div class="settings-option">
+          <span>Vibration</span>
+          <input
+            type="checkbox"
+            id="vibrationToggle"
+            checked
+            onchange="toggleVibrationSetting()"
+          />
+        </div>
+        <p class="app-version-text">Notebook v2.0.0</p>
+      </div>
+    </div>
+
+    <script>
+        // Global view controller tracking property state variable
+        let currentScreen = 'main';
+
+        // Vibration is a user setting, so it must be read through this helper
+        // rather than triggering haptics directly.
+        function vibrate(ms) {
+            if (!isVibrationEnabled()) return;
+
+            // Native haptics. navigator.vibrate is unreliable inside Android
+            // WebView and does nothing on most devices, so prefer the plugin.
+            const haptics = window.Capacitor?.Plugins?.Haptics;
+            if (haptics) {
+                const style = ms >= 50 ? "MEDIUM" : "LIGHT";
+                haptics.impact({ style }).catch(() => {});
+                return;
+            }
+            if (navigator.vibrate) navigator.vibrate(ms);
+        }
+
+        function isVibrationEnabled() {
+            return localStorage.getItem("harbey_vibration") !== "off";
+        }
+
+        function toggleVibrationSetting() {
+            const isOn = document.getElementById("vibrationToggle").checked;
+            localStorage.setItem("harbey_vibration", isOn ? "on" : "off");
+            // Confirm the setting with a buzz only when it was just switched on
+            if (isOn) {
+                const haptics = window.Capacitor?.Plugins?.Haptics;
+                if (haptics) {
+                    haptics.impact({ style: "MEDIUM" }).catch(() => {});
+                } else if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+            }
+        }
+
+        // Single safe reader for stored notes. Corrupt JSON must not crash the app.
+        // Notes are stored as { text, created }. Older saves were plain strings,
+        // so they are migrated on read rather than lost.
+        function readNotes() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem("harbey_notes"));
+                if (!Array.isArray(parsed)) return [];
+                return parsed.map((note) =>
+                    typeof note === "string"
+                        ? { text: note, created: Date.now() }
+                        : note
+                );
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function writeNotes(notes) {
+            localStorage.setItem("harbey_notes", JSON.stringify(notes));
+        }
+
+        let toastTimer = null;
+
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.classList.add("is-visible");
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 1800);
+        }
+
+        // Shares a note through the OS share sheet (WhatsApp, email, SMS, ...)
+        async function shareNote(index) {
+            const notes = readNotes();
+            if (notes === null || !notes[index]) return;
+
+            const { Share } = window.Capacitor?.Plugins ?? {};
+            const title = notes[index].text.split("\n")[0].slice(0, 60) || "Note";
+
+            try {
+                if (Share) {
+                    await Share.share({ title, text: notes[index].text });
+                } else if (navigator.share) {
+                    // Desktop browser fallback
+                    await navigator.share({ title, text: notes[index].text });
+                } else {
+                    showToast("Sharing unavailable");
+                }
+            } catch (e) {
+                // The user dismissing the share sheet rejects; that is not an error
+            }
+        }
+
+        // Copies a note to the OS clipboard
+        async function copyNote(index) {
+            const notes = readNotes();
+            if (notes === null || !notes[index]) return;
+
+            const { Clipboard } = window.Capacitor?.Plugins ?? {};
+            try {
+                if (Clipboard) {
+                    await Clipboard.write({ string: notes[index].text });
+                } else if (navigator.clipboard) {
+                    await navigator.clipboard.writeText(notes[index].text);
+                } else {
+                    showToast("Copy unavailable");
+                    return;
+                }
+                vibrate(30);
+                showToast("Note copied");
+            } catch (e) {
+                showToast("Copy failed");
+            }
+        }
+
+        // "now", "12m", "3h", "Tue", "14 Mar" — short enough for a list row
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const diff = Date.now() - timestamp;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+
+            if (minutes < 1) return "Now";
+            if (minutes < 60) return minutes + "m ago";
+            if (hours < 24) return hours + "h ago";
+            if (days === 1) return "Yesterday";
+            if (days < 7) return date.toLocaleDateString(undefined, { weekday: "short" });
+            return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+        }
+
+        // 1. Core initialization lifecycle hook management loader
+        document.addEventListener("DOMContentLoaded", () => {
+            // Reflect the saved vibration preference into the settings switch
+            document.getElementById("vibrationToggle").checked = isVibrationEnabled();
+            document.getElementById("retryBtn").addEventListener("click", retryLoad);
+            document.getElementById("settingsBtn").addEventListener("click", () => navigateTo('settings'));
+            document.getElementById("backBtn").addEventListener("click", () => navigateTo('main'));
+            document.getElementById("undoBtn").addEventListener("click", undoDelete);
+
+            // Force a simulated 800ms loading delay to verify the UI states
+            setTimeout(() => {
+                renderAppView();
+            }, 800);
+
+            // Dynamically listen for Capacitor Native plugins safely without crashing standard desktop browsers!
+            if (window.Capacitor && window.Capacitor.Plugins) {
+                const { App } = window.Capacitor.Plugins;
+                if (App) {
+                    App.addListener('backButton', () => {
+                        if (currentScreen === 'settings') {
+                            // If user is inside settings screen viewport window, safely navigate back
+                            navigateTo('main');
+                        } else {
+                            // If user is on the main list dashboard screen, cleanly shut down the app package container
+                            App.exitApp();
+                        }
+                    });
+                }
+            }
+        });
+
+        // The Master Navigation Panel Router Switcher
+        function navigateTo(screenTarget) {
+            const mainHeader = document.querySelector('header');
+            const contentViewport = document.querySelector('.content-viewport');
+            const bottomActionBar = document.querySelector('.bottom-action-bar');
+            const settingsView = document.getElementById('settingsView');
+
+            vibrate(20);
+
+            if (screenTarget === 'settings') {
+                currentScreen = 'settings';
+                // Hide all standard main list element grids
+                mainHeader.style.display = 'none';
+                contentViewport.style.display = 'none';
+                bottomActionBar.style.display = 'none';
+                // Slide open the full screen settings viewport panel block
+                settingsView.style.display = 'flex';
+            } else {
+                currentScreen = 'main';
+                // Restore original interface frameworks
+                mainHeader.style.display = 'flex';
+                contentViewport.style.display = 'flex';
+                bottomActionBar.style.display = 'flex';
+                // Close the settings container window element layout
+                settingsView.style.display = 'none';
+            }
+        }
+
+        // The Master State Switcher Function
+        function renderAppView() {
+            const loadingState = document.getElementById("loadingState");
+            const emptyState = document.getElementById("emptyState");
+            const errorState = document.getElementById("errorState");
+            const notesList = document.getElementById("notesList");
+
+            const savedNotes = readNotes();
+            loadingState.style.display = "none";
+
+            if (savedNotes === null) {
+                emptyState.style.display = "none";
+                notesList.style.display = "none";
+                errorState.style.display = "flex";
+                return;
+            }
+
+            errorState.style.display = "none";
+
+            document.getElementById("noteCount").textContent =
+                savedNotes.length === 0
+                    ? "Personal Notes"
+                    : savedNotes.length === 1
+                      ? "1 note"
+                      : savedNotes.length + " notes";
+
+            if (savedNotes.length === 0) {
+                emptyState.style.display = "flex";
+                notesList.style.display = "none";
+            } else {
+                notesList.innerHTML = "";
+                emptyState.style.display = "none";
+                notesList.style.display = "flex";
+
+                savedNotes.forEach((note, index) => {
+                    renderNoteItem(note, index);
+                });
+            }
+        }
+
+        function retryLoad() {
+            document.getElementById("errorState").style.display = "none";
+            document.getElementById("loadingState").style.display = "flex";
+            setTimeout(renderAppView, 400);
+        }
+
+        function addNote() {
+            const input = document.getElementById("noteInput");
+            const noteText = input.value.trim();
+            if (noteText === "") return;
+
+            const savedNotes = readNotes();
+            if (savedNotes === null) return;
+
+            savedNotes.push({ text: noteText, created: Date.now() });
+            writeNotes(savedNotes);
+
+            input.value = "";
+            vibrate(50);
+            renderAppView();
+        }
+
+        function renderNoteItem(note, index) {
+            const notesList = document.getElementById("notesList");
+
+            // Wrapper holds the delete panel behind the card and clips the slide
+            const noteRow = document.createElement("div");
+            noteRow.className = "note-row";
+
+            const panel = document.createElement("div");
+            panel.className = "swipe-delete";
+            panel.innerHTML =
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>Delete';
+            noteRow.appendChild(panel);
+
+            const noteItem = document.createElement("div");
+            noteItem.className = "note-item";
+            noteRow.appendChild(noteItem);
+
+            const body = document.createElement("div");
+            body.className = "note-body";
+
+            // textContent, not innerHTML: note text is user input and must never
+            // be parsed as HTML.
+            const noteText = document.createElement("span");
+            noteText.className = "note-text";
+            noteText.textContent = note.text;
+            // First tap reveals the actions row, second tap on the text edits
+            noteText.addEventListener("click", () => {
+                if (noteItem.classList.contains("is-open")) {
+                    startEditing(noteItem, noteText, index);
+                } else {
+                    document.querySelectorAll(".note-item.is-open").forEach((el) => {
+                        if (el !== noteItem) el.classList.remove("is-open");
+                    });
+                    noteItem.classList.add("is-open");
+                }
+            });
+            body.appendChild(noteText);
+
+            const actions = document.createElement("div");
+            actions.className = "note-actions";
+
+            const shareBtn = document.createElement("button");
+            shareBtn.className = "note-action-btn";
+            shareBtn.type = "button";
+            shareBtn.innerHTML =
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Share';
+            shareBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                shareNote(index);
+            });
+            actions.appendChild(shareBtn);
+
+            const copyBtn = document.createElement("button");
+            copyBtn.className = "note-action-btn";
+            copyBtn.type = "button";
+            copyBtn.innerHTML =
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>Copy';
+            copyBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                copyNote(index);
+            });
+            actions.appendChild(copyBtn);
+
+            body.appendChild(actions);
+
+            const meta = document.createElement("div");
+            meta.className = "note-meta";
+
+            const time = document.createElement("span");
+            time.className = "note-time";
+            time.textContent = formatTime(note.created);
+            meta.appendChild(time);
+
+            const words = note.text.trim().split(/\s+/).filter(Boolean).length;
+            const count = document.createElement("span");
+            count.textContent = words + (words === 1 ? " word" : " words");
+            meta.appendChild(count);
+
+            const hint = document.createElement("span");
+            hint.className = "note-edit-hint";
+            hint.textContent = "Tap to edit";
+            meta.appendChild(hint);
+
+            body.appendChild(meta);
+            noteItem.appendChild(body);
+
+            const deleteBtn = document.createElement("span");
+            deleteBtn.className = "delete-btn";
+            deleteBtn.textContent = "✕";
+            deleteBtn.setAttribute("role", "button");
+            deleteBtn.setAttribute("aria-label", "Delete note");
+            deleteBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const row = noteItem.closest(".note-row");
+                settleSwipeOut(row, noteItem);
+                deleteNote(index, row);
+            });
+            noteItem.appendChild(deleteBtn);
+
+            // Clamp long notes after layout so the line count is known
+            requestAnimationFrame(() => {
+                if (noteText.scrollHeight > noteText.clientHeight + 1) {
+                    noteText.classList.add("is-clamped");
+                }
+            });
+
+            attachSwipe(noteRow, noteItem, panel, index);
+            notesList.appendChild(noteRow);
+        }
+
+        // Horizontal drag reveals the delete panel. Vertical drags are left to
+        // the browser, so the list still scrolls.
+        function attachSwipe(noteRow, noteItem, panel, index) {
+            const startX = { value: 0 };
+            const startY = { value: 0 };
+            let offset = 0;
+            let axis = null;
+            let dragging = false;
+
+            const settle = (to) => {
+                offset = to;
+                noteItem.classList.remove("is-swiping");
+                noteItem.classList.add("is-settling");
+                noteItem.style.transform = "translateX(" + to + "px)";
+                setTimeout(() => noteItem.classList.remove("is-settling"), 200);
+            };
+
+            noteItem.addEventListener("pointerdown", (e) => {
+                // Let buttons and the edit textarea handle their own input
+                if (e.target.closest("button, textarea")) return;
+                startX.value = e.clientX;
+                startY.value = e.clientY;
+                axis = null;
+                dragging = true;
+                noteItem.classList.add("is-swiping");
+            });
+
+            noteItem.addEventListener("pointermove", (e) => {
+                if (!dragging) return;
+                const dx = e.clientX - startX.value;
+                const dy = e.clientY - startY.value;
+
+                // Decide the axis once the user has moved far enough to be clear
+                if (axis === null) {
+                    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+                    axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+                    if (axis === "y") {
+                        dragging = false;
+                        noteItem.classList.remove("is-swiping");
+                        return;
+                    }
+                }
+
+                // Only allow dragging left, and resist past full reveal
+                offset = Math.min(0, dx);
+                if (offset < -110) offset = -110 + (offset + 110) * 0.25;
+                noteItem.style.transform = "translateX(" + offset + "px)";
+            });
+
+            const endSwipe = () => {
+                if (!dragging) return;
+                dragging = false;
+                if (offset < -70) {
+                    settle(-96);
+                    deleteNote(index, noteRow);
+                } else {
+                    settle(0);
+                }
+                offset = 0;
+            };
+
+            noteItem.addEventListener("pointerup", endSwipe);
+            noteItem.addEventListener("pointercancel", endSwipe);
+
+            // Tapping the exposed panel also deletes
+            panel.addEventListener("click", () => {
+                settle(-96);
+                deleteNote(index, noteRow);
+            });
+        }
+
+        let lastDeleted = null;
+        let undoTimer = null;
+
+        function settleSwipeOut(noteRow, noteItem) {
+            if (!noteItem) return;
+            noteItem.classList.remove("is-swiping");
+            noteItem.classList.add("is-settling");
+            noteItem.style.transform = "translateX(-96px)";
+            setTimeout(() => noteItem.classList.remove("is-settling"), 200);
+        }
+
+        function deleteNote(index, noteRow) {
+            const notes = readNotes();
+            if (notes === null) return;
+            if (!notes[index]) return;
+
+            lastDeleted = { note: notes[index], index };
+
+            notes.splice(index, 1);
+            writeNotes(notes);
+            vibrate(30);
+
+            // Collapse the row instead of re-rendering, so the list does not jump
+            if (noteRow) {
+                noteRow.style.height = noteRow.offsetHeight + "px";
+                requestAnimationFrame(() => noteRow.classList.add("is-removing"));
+                setTimeout(() => {
+                    if (lastDeleted) return; // already undone
+                    renderAppView();
+                }, 210);
+            } else {
+                renderAppView();
+            }
+
+            showUndoBar();
+        }
+
+        function showUndoBar() {
+            const bar = document.getElementById("undoBar");
+            bar.classList.add("is-visible");
+            clearTimeout(undoTimer);
+            undoTimer = setTimeout(() => {
+                bar.classList.remove("is-visible");
+                lastDeleted = null;
+            }, 5000);
+        }
+
+        function undoDelete() {
+            if (!lastDeleted) return;
+            const notes = readNotes();
+            if (notes === null) return;
+
+            notes.splice(lastDeleted.index, 0, lastDeleted.note);
+            writeNotes(notes);
+            lastDeleted = null;
+            clearTimeout(undoTimer);
+            document.getElementById("undoBar").classList.remove("is-visible");
+            renderAppView();
+        }
+
+        function startEditing(noteItem, noteText, index) {
+            if (noteItem.querySelector(".note-edit-input")) return;
+
+            const notes = readNotes();
+            if (notes === null) return;
+
+            const original = notes[index].text;
+            const input = document.createElement("textarea");
+            input.className = "note-edit-input";
+            input.rows = 3;
+            input.value = original;
+
+            const commit = () => {
+                const next = input.value.trim();
+                if (next === original) {
+                    renderAppView();
+                    return;
+                }
+                if (next === "") {
+                    deleteNote(index, null);
+                    return;
+                }
+                notes[index].text = next;
+                notes[index].created = Date.now();
+                writeNotes(notes);
+                vibrate(30);
+                renderAppView();
+            };
+
+            input.addEventListener("blur", commit);
+            input.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    input.blur();
+                }
+                if (e.key === "Escape") {
+                    input.value = original;
+                    input.blur();
+                }
+            });
+
+            noteText.replaceWith(input);
+            noteItem.classList.add("is-editing");
+            noteItem.classList.remove("is-open");
+            input.focus();
+            input.setSelectionRange(input.value.length, input.value.length);
+        }
+    </script>
+
+  </body>
+</html>

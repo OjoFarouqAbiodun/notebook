@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#16150F</color>
+    <color name="colorPrimaryDark">#16150F</color>
+    <color name="colorAccent">#B8410A</color>
+    <color name="notebookPaper">#FBFAF7</color>
+</resources>
