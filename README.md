@@ -15,7 +15,7 @@ Every screen is built as a deliberate set of states — **loading**, **empty**, 
 
 ## Features
 
-- **Offline only.** No server, no network permission needed at runtime. Notes live in `localStorage`.
+- **Offline only.** No server and no network calls at runtime. Notes live in `localStorage` and are never sent anywhere. (The manifest keeps Capacitor's default `INTERNET` entry because the WebView loads its assets over `http://localhost`; the app makes no requests.)
 - **Share to any app** via the native Android share sheet (WhatsApp, SMS, email, Bluetooth).
 - **Copy** to the system clipboard, with a confirmation toast.
 - **Swipe to delete with undo.** Deletions are recoverable for 5 seconds and restore at their original position.
